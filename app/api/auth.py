@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.api.deps import get_db
 from app.core.security import hash_password
 from app.models.user import User
 from app.schemas.user import UserCreate, UserOut
@@ -16,10 +16,10 @@ from app.core.security import (
     hash_password,
     verify_password,
     create_access_token,
-    get_current_user,
 )
 from app.schemas.user import Token
-from app.core.security import get_current_user
+from app.api.deps import get_current_active_user
+from app.models.enums import UserRole
 
 router = APIRouter(
     prefix="/auth",
@@ -50,7 +50,7 @@ def register(
     new_user = User(
         email=user.email,
         hashed_password=hash_password(user.password),
-        role="USER"
+        role=UserRole.USER
     )
 
     db.add(new_user)
@@ -95,6 +95,6 @@ def login(
 
 @router.get("/me", response_model=UserOut)
 def get_me(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     return current_user

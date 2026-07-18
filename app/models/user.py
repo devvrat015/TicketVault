@@ -1,9 +1,12 @@
 from datetime import datetime
 
 from sqlalchemy import String, DateTime
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Enum as SQLEnum
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from app.models.event import Event
 from app.models.enums import UserRole
 from app.core.database import Base
 
@@ -44,5 +47,9 @@ class User(Base):
         default=datetime.utcnow,
         nullable=False
     )
-
+    
+    events: Mapped[list["Event"]] = relationship(
+    "Event",
+    back_populates="organizer"
+)
     

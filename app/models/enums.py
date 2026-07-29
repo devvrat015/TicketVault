@@ -10,3 +10,8 @@ class SeatStatus(str, Enum):
     AVAILABLE = "available"
     HELD = "held"
     BOOKED = "booked"
+
+class BookingStatus(str, Enum):
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    CANCELLED = "cancelled"

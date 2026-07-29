@@ -48,3 +48,10 @@ class Seat(Base):
         "Event",
         back_populates="seats"
     )
+
+    booking_id: Mapped[int | None] = mapped_column(
+    ForeignKey("bookings.id"),
+    nullable=True
+    )
+
+    booking = relationship("Booking", back_populates="seats")

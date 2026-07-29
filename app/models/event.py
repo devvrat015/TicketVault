@@ -56,3 +56,5 @@ class Event(Base):
         back_populates="event",
         cascade="all, delete-orphan"
     )
+
+    bookings = relationship("Booking", back_populates="event")

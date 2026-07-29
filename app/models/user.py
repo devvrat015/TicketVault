@@ -51,5 +51,6 @@ class User(Base):
     events: Mapped[list["Event"]] = relationship(
     "Event",
     back_populates="organizer"
-)
-    
+    )
+
+    bookings = relationship("Booking", back_populates="user")

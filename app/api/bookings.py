@@ -33,7 +33,7 @@ def book_seat(
         detail="Event not found"
     )
 
-    seat = db.query(Seat).filter(Seat.id == seat_id).first()
+    seat = db.query(Seat).filter(Seat.id == seat_id).with_for_update().first()
 
     if not seat:
      raise HTTPException(

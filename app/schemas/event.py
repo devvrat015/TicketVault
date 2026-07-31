@@ -26,6 +26,7 @@ class EventOut(BaseModel):
     event_date: datetime
 
     venue: VenueOut
+    version: int
 
     model_config = {
         "from_attributes": True
@@ -36,6 +37,7 @@ class EventUpdate(BaseModel):
     description: str
     event_date: datetime
     venue_id: int
+    version: int
 
     @field_validator("event_date")
     @classmethod

@@ -57,4 +57,9 @@ class Event(Base):
         cascade="all, delete-orphan"
     )
 
+    version: Mapped[int] = mapped_column(
+    nullable=False,
+    default=0
+    )
+    
     bookings = relationship("Booking", back_populates="event")

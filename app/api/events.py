@@ -153,12 +153,32 @@ def update_event(
             detail="Venue not found",
         )
 
-    event.title = event_data.title
-    event.description = event_data.description
-    event.event_date = event_data.event_date
-    event.venue_id = event_data.venue_id
+    result = (
+    db.query(Event)
+    .filter(
+        Event.id == event_id,
+        Event.version == event_data.version,
+    )
+    .update(
+        {
+            Event.title: event_data.title,
+            Event.description: event_data.description,
+            Event.event_date: event_data.event_date,
+            Event.venue_id: event_data.venue_id,
+            Event.version: Event.version + 1,
+        },
+        synchronize_session=False,
+    )
+)
 
     db.commit()
+
+    if result == 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Event was modified by someone else. Please refresh and try again.",
+        )
+
     db.refresh(event)
 
     return event

@@ -11,6 +11,8 @@ from app.core.exceptions import (
 from app.models.user import User
 from app.schemas.booking import BookingResponse
 from app.services.booking_service import book_seat
+from app.core.redis_client import redis_client
+from app.services import hold_service
 
 router = APIRouter(
     prefix="/bookings",
@@ -64,4 +66,45 @@ def book_seat_route(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to book seat.",
+        )
+
+
+@router.post("/events/{event_id}/seats/{seat_id}/hold")
+def hold_seat_route(
+    event_id: int,
+    seat_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    try:
+        return hold_service.hold_seat(
+            db=db,
+            redis_client=redis_client,
+            user_id=current_user.id,
+            event_id=event_id,
+            seat_id=seat_id,
+        )
+
+    except EventNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="Event not found",
+        )
+
+    except SeatNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="Seat not found",
+        )
+
+    except SeatEventMismatchError:
+        raise HTTPException(
+            status_code=400,
+            detail="Seat does not belong to this event",
+        )
+
+    except SeatNotAvailableError:
+        raise HTTPException(
+            status_code=400,
+            detail="Seat not available",
         )

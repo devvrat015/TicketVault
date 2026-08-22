@@ -9,6 +9,11 @@ from app.models.event import Event
 from app.models.user import User
 from app.models.venue import Venue
 from app.schemas.event import EventCreate, EventOut, EventUpdate
+from app.core.cache import (
+    get_cache,
+    set_cache,
+    delete_cache,
+)
 
 router = APIRouter(
     prefix="/events",
@@ -65,6 +70,8 @@ def create_event(
             db.add(seat)
 
     db.commit()
+    delete_cache("events:list:all")
+
     return new_event
 
 
@@ -75,13 +82,31 @@ def create_event(
 def get_all_events(
     db: Session = Depends(get_db),
 ):
+    cache_key = "events:list:all"
+
+    cached = get_cache(cache_key)
+
+    if cached is not None:
+        return cached
+
     events = (
         db.query(Event)
         .options(joinedload(Event.venue))
         .all()
     )
 
-    return events    
+    result = [
+        EventOut.model_validate(event).model_dump(mode="json")
+        for event in events
+    ]
+
+    set_cache(
+        cache_key,
+        result,
+        ttl=60,
+    )
+
+    return result    
 
 
 @router.get(
@@ -92,6 +117,13 @@ def get_event(
     event_id: int,
     db: Session = Depends(get_db),
 ):
+    cache_key = f"event:{event_id}"
+
+    cached = get_cache(cache_key)
+
+    if cached is not None:
+        return cached
+
     event = (
         db.query(Event)
         .options(joinedload(Event.venue))
@@ -105,7 +137,15 @@ def get_event(
             detail="Event not found",
         )
 
-    return event
+    result = EventOut.model_validate(event).model_dump(mode="json")
+
+    set_cache(
+        cache_key,
+        result,
+        ttl=60,
+    )
+
+    return result
 
 
 @router.put(
@@ -180,6 +220,8 @@ def update_event(
         )
 
     db.refresh(event)
+    delete_cache(f"event:{event_id}")
+    delete_cache("events:list:all")
 
     return event
 
@@ -214,3 +256,5 @@ def delete_event(
 
     db.delete(event)
     db.commit()
+    delete_cache(f"event:{event_id}")
+    delete_cache("events:list:all")

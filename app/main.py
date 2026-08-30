@@ -9,17 +9,30 @@ from app.api.events import router as events_router
 from app.api.bookings import router as bookings_router
 from app.api.ws import router as ws_router
 from app.services.hold_expiration import listen_for_expired_holds
-
+from app.core.pubsub_listener import listen_for_events
 
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(listen_for_expired_holds())
+
+    expired_holds_task = asyncio.create_task(
+        listen_for_expired_holds()
+    )
+
+    pubsub_task = asyncio.create_task(
+        listen_for_events()
+    )
 
     yield
 
-    task.cancel()
+    expired_holds_task.cancel()
+    pubsub_task.cancel()
 
     try:
-        await task
+        await expired_holds_task
+    except asyncio.CancelledError:
+        pass
+
+    try:
+        await pubsub_task
     except asyncio.CancelledError:
         pass
 

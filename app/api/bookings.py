@@ -13,7 +13,7 @@ from app.schemas.booking import BookingResponse
 from app.services.booking_service import book_seat
 from app.core.redis_client import redis_client
 from app.services import hold_service
-from app.core.connection_manager import manager
+from app.core.redis_client import redis_client, publish_event
 
 router = APIRouter(
     prefix="/bookings",
@@ -39,8 +39,8 @@ async def book_seat_route(
         seat_id=seat_id,
         )
 
-        await manager.broadcast(
-        event_id,
+        await publish_event(
+        f"event:{event_id}:updates",
         {
         "seat_id": seat_id,
         "status": "booked",
@@ -96,11 +96,11 @@ async def hold_seat_route(
             seat_id=seat_id,
         )
 
-        await manager.broadcast(
-            event_id,
+        await publish_event(
+            f"event:{event_id}:updates",
             {
-                "seat_id": seat_id,
-                "status": "held",
+            "seat_id": seat_id,
+            "status": "held",
             },
         )
 

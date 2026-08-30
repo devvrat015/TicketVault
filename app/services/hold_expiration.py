@@ -1,6 +1,6 @@
 import asyncio
 
-from app.core.connection_manager import manager
+from app.core.redis_client import redis_client, publish_event
 from app.core.redis_client import redis_client
 from app.core.database import SessionLocal
 from app.models.enums import SeatStatus
@@ -29,8 +29,8 @@ async def release_expired_seat(seat_id: int):
 
         db.commit()
 
-        await manager.broadcast(
-            event_id,
+        await publish_event(
+            f"event:{event_id}:updates",
             {
                 "seat_id": seat_id,
                 "status": "available",

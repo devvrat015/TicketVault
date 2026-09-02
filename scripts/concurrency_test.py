@@ -7,7 +7,7 @@ BASE_URL = "http://localhost:8000"
 
 EVENT_ID = 1
 
-SEAT_ID = 9
+SEAT_ID = 28
 
 
 with open("tokens.json") as f:

@@ -14,6 +14,7 @@ async def release_expired_seat(seat_id: int):
         seat = (
             db.query(Seat)
             .filter(Seat.id == seat_id)
+            .with_for_update()
             .first()
         )
 

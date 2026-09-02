@@ -34,6 +34,7 @@ async def book_seat_route(
     try:
         booking = book_seat(
         db=db,
+        redis_client=redis_client,
         user_id=current_user.id,
         event_id=event_id,
         seat_id=seat_id,

@@ -53,7 +53,7 @@ def hold_seat(
 
         redis_client.setex(
             redis_key,
-            100,
+            300,
             str(user_id),
         )
 
@@ -61,7 +61,7 @@ def hold_seat(
             "seat_id": seat_id,
             "user_id": user_id,
             "status": SeatStatus.HELD,
-            "expires_in": 100,
+            "expires_in": 300,
         }
 
     except Exception:

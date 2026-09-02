@@ -10,9 +10,15 @@ from app.api.bookings import router as bookings_router
 from app.api.ws import router as ws_router
 from app.services.hold_expiration import listen_for_expired_holds
 from app.core.pubsub_listener import listen_for_events
+from app.core.redis_client import async_redis_client
 
 async def lifespan(app: FastAPI):
 
+    await async_redis_client.config_set(
+    "notify-keyspace-events",
+    "Ex"
+    )
+    
     expired_holds_task = asyncio.create_task(
         listen_for_expired_holds()
     )

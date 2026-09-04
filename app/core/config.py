@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     REDIS_URL: str
+    STRIPE_SECRET_KEY: str
+    STRIPE_SUCCESS_URL: str
+    STRIPE_CANCEL_URL: str
 
     model_config = SettingsConfigDict(
         env_file=".env"

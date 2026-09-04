@@ -11,6 +11,7 @@ from app.api.ws import router as ws_router
 from app.services.hold_expiration import listen_for_expired_holds
 from app.core.pubsub_listener import listen_for_events
 from app.core.redis_client import async_redis_client
+from app.api.payments import router as payments_router
 
 async def lifespan(app: FastAPI):
 
@@ -51,6 +52,7 @@ app.include_router(venues_router)
 app.include_router(events_router)
 app.include_router(bookings_router)
 app.include_router(ws_router)
+app.include_router(payments_router)
 
 @app.get("/health")
 def health():

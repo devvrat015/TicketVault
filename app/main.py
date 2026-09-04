@@ -12,7 +12,7 @@ from app.services.hold_expiration import listen_for_expired_holds
 from app.core.pubsub_listener import listen_for_events
 from app.core.redis_client import async_redis_client
 from app.api.payments import router as payments_router
-
+from app.api.webhooks import router as webhooks_router
 async def lifespan(app: FastAPI):
 
     await async_redis_client.config_set(
@@ -53,6 +53,8 @@ app.include_router(events_router)
 app.include_router(bookings_router)
 app.include_router(ws_router)
 app.include_router(payments_router)
+app.include_router(webhooks_router)
+
 
 @app.get("/health")
 def health():
@@ -61,4 +63,15 @@ def health():
         "app": Settings.APP_NAME
     }
 
+@app.get("/checkout-success")
+def checkout_success(session_id: str):
+    return {
+        "message": "Payment successful",
+        "session_id": session_id,
+    }
 
+@app.get("/checkout-cancel")
+def checkout_cancel():
+    return {
+        "message": "Payment cancelled"
+    }

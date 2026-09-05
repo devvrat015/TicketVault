@@ -14,6 +14,7 @@ from app.core.idempotency import (
 from app.models.booking import Booking
 from app.models.seat import Seat
 from app.models.enums import SeatStatus, BookingStatus
+from app.tasks.email_tasks import send_ticket_email
 
 
 router = APIRouter()
@@ -51,6 +52,8 @@ async def finalize_booking(seat_id: int, user_id: int):
 
         # First make the database change permanent
         db.commit()
+
+        send_ticket_email.delay(booking.id)
 
         # Now remove the temporary Redis hold
         await async_redis_client.delete(

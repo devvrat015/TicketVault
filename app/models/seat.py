@@ -41,7 +41,8 @@ class Seat(Base):
 
     event_id: Mapped[int] = mapped_column(
         ForeignKey("events.id"),
-        nullable=False
+        nullable=False,
+        index=True
     )
 
     event: Mapped["Event"] = relationship(

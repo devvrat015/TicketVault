@@ -28,7 +28,8 @@ class Event(Base):
 
     event_date: Mapped[datetime] = mapped_column(
         DateTime,
-        nullable=False
+        nullable=False,
+        index=True
     )
 
     venue_id: Mapped[int] = mapped_column(

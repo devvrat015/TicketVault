@@ -13,16 +13,18 @@ from app.models.enums import BookingStatus
 class Booking(Base):
     __tablename__ = "bookings"
 
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    id: Mapped[int] = mapped_column(primary_key=True)
 
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id"),
-        nullable=False
+        nullable=False,
+        index=True
     )
 
     event_id: Mapped[int] = mapped_column(
         ForeignKey("events.id"),
-        nullable=False
+        nullable=False,
+        index=True
     )
 
     total_amount: Mapped[float] = mapped_column(

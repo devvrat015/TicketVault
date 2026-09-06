@@ -20,7 +20,8 @@ class Venue(Base):
 
     city: Mapped[str] = mapped_column(
         String(255),
-        nullable=False
+        nullable=False,
+        index=True
     )
 
     address: Mapped[str] = mapped_column(

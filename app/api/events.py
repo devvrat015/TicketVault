@@ -1,5 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import date, datetime, time
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
+
 from app.models.seat import Seat
 from app.models.enums import SeatStatus
 from app.api.deps import get_db
@@ -108,6 +111,106 @@ def get_all_events(
 
     return result    
 
+@router.get(
+    "/search",
+    response_model=dict,
+)
+def search_events(
+    q: str | None = None,
+    city: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    query = (
+        db.query(Event)
+        .join(Venue, Event.venue_id == Venue.id)
+        .options(joinedload(Event.venue))
+    )
+
+    # Full-text search
+    if q:
+        search_vector = func.to_tsvector(
+            "english",
+            func.concat(
+                Event.title,
+                " ",
+                Event.description
+            )
+        )
+
+        search_query = func.plainto_tsquery(
+            "english",
+            q
+        )
+
+        query = query.filter(
+            search_vector.op("@@")(search_query)
+        )
+
+    # City filter
+    if city:
+        query = query.filter(
+            func.lower(Venue.city) == city.lower()
+        )
+
+    # Date range
+    if date_from:
+        start_datetime = datetime.combine(
+            date_from,
+            time.min
+        )
+
+        query = query.filter(
+            Event.event_date >= start_datetime
+        )
+
+    if date_to:
+        end_datetime = datetime.combine(
+            date_to,
+            time.max
+        )
+
+        query = query.filter(
+            Event.event_date <= end_datetime
+        )
+
+    # Stable ordering for pagination
+    query = query.order_by(
+        Event.event_date.asc(),
+        Event.id.asc()
+    )
+
+    # Count matching events
+    total = query.count()
+
+    # Calculate offset
+    offset = (page - 1) * page_size
+
+    # Get requested page
+    results = (
+        query
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
+
+    return {
+        "results": [
+            EventOut.model_validate(event).model_dump(
+                mode="json"
+            )
+            for event in results
+        ],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": (
+            (total + page_size - 1) // page_size
+        ),
+    }
 
 @router.get(
     "/{event_id}",

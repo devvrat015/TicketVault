@@ -83,18 +83,25 @@ def create_event(
     response_model=list[EventOut],
 )
 def get_all_events(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    cache_key = "events:list:all"
+    cache_key = f"events:list:page:{page}:limit:{limit}"
 
     cached = get_cache(cache_key)
 
     if cached is not None:
         return cached
+    
+
+    offset = (page - 1) * limit
 
     events = (
         db.query(Event)
         .options(joinedload(Event.venue))
+        .offset(offset)
+        .limit(limit)
         .all()
     )
 

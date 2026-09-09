@@ -14,6 +14,7 @@ from app.services.booking_service import book_seat
 from app.core.redis_client import redis_client
 from app.services import hold_service
 from app.core.redis_client import redis_client, publish_event
+from app.core.rate_limit import rate_limiter_by_user
 
 router = APIRouter(
     prefix="/bookings",
@@ -86,7 +87,12 @@ async def hold_seat_route(
     event_id: int,
     seat_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(
+    rate_limiter_by_user(
+        max_requests=10,
+        window_seconds=60
+        )
+    ),
 ):
     try:
         hold = hold_service.hold_seat(
@@ -95,6 +101,7 @@ async def hold_seat_route(
             user_id=current_user.id,
             event_id=event_id,
             seat_id=seat_id,
+            
         )
 
         await publish_event(

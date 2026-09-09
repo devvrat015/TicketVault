@@ -132,22 +132,13 @@ def search_events(
 
     # Full-text search
     if q:
-        search_vector = func.to_tsvector(
-            "english",
-            func.concat(
-                Event.title,
-                " ",
-                Event.description
-            )
-        )
-
         search_query = func.plainto_tsquery(
             "english",
             q
         )
 
         query = query.filter(
-            search_vector.op("@@")(search_query)
+        Event.search_vector.op("@@")(search_query)
         )
 
     # City filter

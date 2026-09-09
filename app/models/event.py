@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import String, Text, DateTime, ForeignKey
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import TYPE_CHECKING
 
@@ -26,6 +27,11 @@ class Event(Base):
         nullable=False
     )
 
+    search_vector: Mapped[str] = mapped_column(
+    TSVECTOR,
+    nullable=True
+    )
+    
     event_date: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,

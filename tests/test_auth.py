@@ -403,3 +403,35 @@ def test_organizer_cannot_delete_another_organizers_event(client, db_session):
     )
 
     assert response.status_code == 403
+
+
+def test_login_rate_limit(client):
+    # Register user
+    client.post(
+        "/auth/register",
+        json={
+            "email": "ratelimit@example.com",
+            "password": "password123",
+        },
+    )
+
+    login_data = {
+        "username": "ratelimit@example.com",
+        "password": "password123",
+    }
+
+    # First 5 requests should be allowed
+    for _ in range(5):
+        response = client.post(
+            "/auth/login",
+            data=login_data,
+        )
+        assert response.status_code == 200
+
+    # 6th request should be rate limited
+    response = client.post(
+        "/auth/login",
+        data=login_data,
+    )
+
+    assert response.status_code == 429

@@ -13,6 +13,7 @@ from app.core.pubsub_listener import listen_for_events
 from app.core.redis_client import async_redis_client
 from app.api.payments import router as payments_router
 from app.api.webhooks import router as webhooks_router
+
 async def lifespan(app: FastAPI):
 
     await async_redis_client.config_set(

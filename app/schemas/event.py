@@ -14,8 +14,12 @@ class EventCreate(BaseModel):
     @field_validator("event_date")
     @classmethod
     def validate_event_date(cls, value: datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+
         if value < datetime.now(timezone.utc):
             raise ValueError("Event date cannot be in the past")
+
         return value
 
 

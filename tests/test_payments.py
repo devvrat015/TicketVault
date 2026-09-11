@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
+import stripe
 
 from app.core.security import hash_password
 from app.models.user import User
@@ -107,3 +108,230 @@ def test_create_checkout_session_with_mock_stripe(client, db_session):
     assert data["checkout_url"] == "https://checkout.stripe.com/test-session"
 
     mock_create_checkout.assert_called_once()
+
+
+def test_stripe_webhook_success(client):
+    mock_session = type(
+        "MockStripeSession",
+        (),
+        {
+            "payment_status": "paid",
+            "metadata": {
+                "seat_id": "1",
+                "user_id": "1",
+            },
+        },
+    )()
+
+    mock_event = {
+        "id": "evt_test_123",
+        "type": "checkout.session.completed",
+        "data": {
+            "object": mock_session,
+        },
+    }
+
+    with patch(
+        "app.api.webhooks.stripe.Webhook.construct_event",
+        return_value=mock_event,
+    ), patch(
+        "app.api.webhooks.check_and_store_idempotency",
+        new_callable=AsyncMock,
+        return_value=(False, None),
+    ), patch(
+        "app.api.webhooks.finalize_booking",
+        new_callable=AsyncMock,
+        return_value={
+            "booking_id": 1,
+            "event_id": 1,
+            "seat_id": 1,
+        },
+    ) as mock_finalize_booking, patch(
+        "app.api.webhooks.publish_event",
+        new_callable=AsyncMock,
+    ) as mock_publish_event, patch(
+        "app.api.webhooks.store_idempotent_result",
+        new_callable=AsyncMock,
+    ):
+
+        response = client.post(
+            "/webhooks/stripe",
+            content=b"test-payload",
+            headers={
+                "Stripe-Signature": "test-signature",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "success"}
+
+    mock_finalize_booking.assert_awaited_once_with(
+        seat_id=1,
+        user_id=1,
+    )
+
+    mock_publish_event.assert_awaited_once()
+
+
+def test_stripe_webhook_invalid_payload(client):
+    with patch(
+        "app.api.webhooks.stripe.Webhook.construct_event",
+        side_effect=ValueError,
+    ):
+        response = client.post(
+            "/webhooks/stripe",
+            content=b"invalid-payload",
+            headers={
+                "Stripe-Signature": "test-signature",
+            },
+        )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Invalid payload"
+    }
+
+
+def test_stripe_webhook_invalid_signature(client):
+    with patch(
+        "app.api.webhooks.stripe.Webhook.construct_event",
+        side_effect=stripe.error.SignatureVerificationError(
+            "Invalid signature",
+            "test-signature",
+        ),
+    ):
+        response = client.post(
+            "/webhooks/stripe",
+            content=b"test-payload",
+            headers={
+                "Stripe-Signature": "test-signature",
+            },
+        )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Invalid webhook signature"
+    }
+
+
+def test_stripe_webhook_duplicate_event(client):
+    mock_event = {
+        "id": "evt_test_duplicate",
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {}
+        },
+    }
+
+    with patch(
+        "app.api.webhooks.stripe.Webhook.construct_event",
+        return_value=mock_event,
+    ), patch(
+        "app.api.webhooks.check_and_store_idempotency",
+        new_callable=AsyncMock,
+        return_value=(True, {"processed": True}),
+    ), patch(
+        "app.api.webhooks.finalize_booking",
+        new_callable=AsyncMock,
+    ) as mock_finalize_booking:
+
+        response = client.post(
+            "/webhooks/stripe",
+            content=b"test-payload",
+            headers={
+                "Stripe-Signature": "test-signature",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "already processed"
+    }
+
+    mock_finalize_booking.assert_not_awaited()
+
+
+def test_stripe_webhook_payment_not_completed(client):
+    mock_session = type(
+        "MockStripeSession",
+        (),
+        {
+            "payment_status": "unpaid",
+            "metadata": {
+                "seat_id": "1",
+                "user_id": "1",
+            },
+        },
+    )()
+
+    mock_event = {
+        "id": "evt_test_unpaid",
+        "type": "checkout.session.completed",
+        "data": {
+            "object": mock_session,
+        },
+    }
+
+    with patch(
+        "app.api.webhooks.stripe.Webhook.construct_event",
+        return_value=mock_event,
+    ), patch(
+        "app.api.webhooks.check_and_store_idempotency",
+        new_callable=AsyncMock,
+        return_value=(False, None),
+    ), patch(
+        "app.api.webhooks.finalize_booking",
+        new_callable=AsyncMock,
+    ) as mock_finalize_booking:
+
+        response = client.post(
+            "/webhooks/stripe",
+            content=b"test-payload",
+            headers={
+                "Stripe-Signature": "test-signature",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "payment not completed"
+    }
+
+    mock_finalize_booking.assert_not_awaited()
+
+
+def test_stripe_webhook_other_event(client):
+    mock_event = {
+        "id": "evt_test_other",
+        "type": "payment_intent.created",
+        "data": {
+            "object": {}
+        },
+    }
+
+    with patch(
+        "app.api.webhooks.stripe.Webhook.construct_event",
+        return_value=mock_event,
+    ), patch(
+        "app.api.webhooks.check_and_store_idempotency",
+        new_callable=AsyncMock,
+        return_value=(False, None),
+    ), patch(
+        "app.api.webhooks.store_idempotent_result",
+        new_callable=AsyncMock,
+    ) as mock_store:
+
+        response = client.post(
+            "/webhooks/stripe",
+            content=b"test-payload",
+            headers={
+                "Stripe-Signature": "test-signature",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success"
+    }
+
+    mock_store.assert_awaited_once()

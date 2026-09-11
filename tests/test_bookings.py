@@ -350,3 +350,331 @@ def test_concurrent_booking_same_seat(client, concurrency_client, db_session):
     status_codes = sorted(response.status_code for response in responses)
 
     assert status_codes == [200, 400]
+
+from datetime import datetime
+def test_hold_seat_success(db_session):
+    from app.models.event import Event
+    from app.models.seat import Seat
+    from app.models.venue import Venue
+    from app.models.enums import SeatStatus
+    from app.services.hold_service import hold_seat
+    from unittest.mock import Mock
+    from app.models.user import User
+    from app.models.enums import UserRole
+    from app.core.security import hash_password
+    
+    venue = Venue(
+        name="Test Venue",
+        city="Mumbai",
+        address="123 Test Street",
+    )
+    db_session.add(venue)
+    db_session.commit()
+
+    organizer = User(
+    email="hold-test-organizer@example.com",
+    hashed_password=hash_password("password123"),
+    role=UserRole.ORGANIZER,
+    )
+    db_session.add(organizer)
+    db_session.commit()
+
+    event = Event(
+        title="Test Event",
+        venue_id=venue.id,
+        description="testing event",
+        event_date=datetime(2027, 1, 15, 18, 0),
+        organizer_id=organizer.id,
+    )
+    db_session.add(event)
+    db_session.commit()
+
+    seat = Seat(
+        event_id=event.id,
+        row_label="A",
+        seat_number=1,
+        price=500,
+        status=SeatStatus.AVAILABLE,
+    )
+    db_session.add(seat)
+    db_session.commit()
+
+    mock_redis = Mock()
+
+    result = hold_seat(
+        db=db_session,
+        redis_client=mock_redis,
+        user_id=1,
+        event_id=event.id,
+        seat_id=seat.id,
+    )
+
+    assert result["seat_id"] == seat.id
+    assert result["user_id"] == 1
+    assert result["status"] == SeatStatus.HELD
+    assert result["expires_in"] == 300
+
+    db_session.refresh(seat)
+    assert seat.status == SeatStatus.HELD
+
+    mock_redis.setex.assert_called_once_with(
+        f"seat_hold:{seat.id}",
+        300,
+        "1",
+    )
+
+
+def test_hold_seat_event_not_found(db_session):
+    from app.services.hold_service import hold_seat
+    from app.core.exceptions import EventNotFoundError
+    from unittest.mock import Mock
+    import pytest
+
+    with pytest.raises(EventNotFoundError):
+        hold_seat(
+            db=db_session,
+            redis_client=Mock(),
+            user_id=1,
+            event_id=99999,
+            seat_id=99999,
+        )
+
+
+def test_hold_seat_not_found(db_session):
+    from app.models.event import Event
+    from app.models.venue import Venue
+    from app.models.user import User
+    from app.models.enums import UserRole
+    from app.core.security import hash_password
+    from app.services.hold_service import hold_seat
+    from app.core.exceptions import SeatNotFoundError
+    from unittest.mock import Mock
+    from datetime import datetime
+    import pytest
+
+    venue = Venue(
+        name="Test Venue",
+        city="Mumbai",
+        address="123 Test Street",
+    )
+    db_session.add(venue)
+    db_session.commit()
+
+    organizer = User(
+        email="seat-not-found@example.com",
+        hashed_password=hash_password("password123"),
+        role=UserRole.ORGANIZER,
+    )
+    db_session.add(organizer)
+    db_session.commit()
+
+    event = Event(
+        title="Test Event",
+        venue_id=venue.id,
+        description="testing event",
+        event_date=datetime(2027, 1, 15, 18, 0),
+        organizer_id=organizer.id,
+    )
+    db_session.add(event)
+    db_session.commit()
+
+    with pytest.raises(SeatNotFoundError):
+        hold_seat(
+            db=db_session,
+            redis_client=Mock(),
+            user_id=1,
+            event_id=event.id,
+            seat_id=99999,
+        )
+
+
+def test_hold_seat_event_mismatch(db_session):
+    from app.models.event import Event
+    from app.models.seat import Seat
+    from app.models.venue import Venue
+    from app.models.user import User
+    from app.models.enums import SeatStatus, UserRole
+    from app.core.security import hash_password
+    from app.services.hold_service import hold_seat
+    from app.core.exceptions import SeatEventMismatchError
+    from unittest.mock import Mock
+    from datetime import datetime
+    import pytest
+
+    venue = Venue(
+        name="Test Venue",
+        city="Mumbai",
+        address="123 Test Street",
+    )
+    db_session.add(venue)
+    db_session.commit()
+
+    organizer = User(
+        email="mismatch-test@example.com",
+        hashed_password=hash_password("password123"),
+        role=UserRole.ORGANIZER,
+    )
+    db_session.add(organizer)
+    db_session.commit()
+
+    event1 = Event(
+        title="Event One",
+        venue_id=venue.id,
+        description="testing event",
+        event_date=datetime(2027, 1, 15, 18, 0),
+        organizer_id=organizer.id,
+    )
+
+    event2 = Event(
+        title="Event Two",
+        venue_id=venue.id,
+        description="testing event",
+        event_date=datetime(2027, 1, 16, 18, 0),
+        organizer_id=organizer.id,
+    )
+
+    db_session.add_all([event1, event2])
+    db_session.commit()
+
+    seat = Seat(
+        event_id=event1.id,
+        row_label="A",
+        seat_number=1,
+        price=500,
+        status=SeatStatus.AVAILABLE,
+    )
+    db_session.add(seat)
+    db_session.commit()
+
+    with pytest.raises(SeatEventMismatchError):
+        hold_seat(
+            db=db_session,
+            redis_client=Mock(),
+            user_id=1,
+            event_id=event2.id,
+            seat_id=seat.id,
+        )
+
+
+def test_hold_seat_not_available(db_session):
+    from app.models.event import Event
+    from app.models.seat import Seat
+    from app.models.venue import Venue
+    from app.models.user import User
+    from app.models.enums import SeatStatus, UserRole
+    from app.core.security import hash_password
+    from app.services.hold_service import hold_seat
+    from app.core.exceptions import SeatNotAvailableError
+    from unittest.mock import Mock
+    from datetime import datetime
+    import pytest
+
+    venue = Venue(
+        name="Test Venue",
+        city="Mumbai",
+        address="123 Test Street",
+    )
+    db_session.add(venue)
+    db_session.commit()
+
+    organizer = User(
+        email="unavailable-test@example.com",
+        hashed_password=hash_password("password123"),
+        role=UserRole.ORGANIZER,
+    )
+    db_session.add(organizer)
+    db_session.commit()
+
+    event = Event(
+        title="Test Event",
+        venue_id=venue.id,
+        description="testing event",
+        event_date=datetime(2027, 1, 15, 18, 0),
+        organizer_id=organizer.id,
+    )
+    db_session.add(event)
+    db_session.commit()
+
+    seat = Seat(
+        event_id=event.id,
+        row_label="A",
+        seat_number=1,
+        price=500,
+        status=SeatStatus.HELD,
+    )
+    db_session.add(seat)
+    db_session.commit()
+
+    with pytest.raises(SeatNotAvailableError):
+        hold_seat(
+            db=db_session,
+            redis_client=Mock(),
+            user_id=1,
+            event_id=event.id,
+            seat_id=seat.id,
+        )
+
+
+def test_hold_seat_redis_failure_rolls_back(db_session):
+    from app.models.event import Event
+    from app.models.seat import Seat
+    from app.models.venue import Venue
+    from app.models.user import User
+    from app.models.enums import SeatStatus, UserRole
+    from app.core.security import hash_password
+    from app.services.hold_service import hold_seat
+    from unittest.mock import Mock
+    from datetime import datetime
+    import pytest
+
+    venue = Venue(
+        name="Test Venue",
+        city="Mumbai",
+        address="123 Test Street",
+    )
+    db_session.add(venue)
+    db_session.commit()
+
+    organizer = User(
+        email="redis-failure@example.com",
+        hashed_password=hash_password("password123"),
+        role=UserRole.ORGANIZER,
+    )
+    db_session.add(organizer)
+    db_session.commit()
+
+    event = Event(
+        title="Test Event",
+        venue_id=venue.id,
+        description="testing event",
+        event_date=datetime(2027, 1, 15, 18, 0),
+        organizer_id=organizer.id,
+    )
+    db_session.add(event)
+    db_session.commit()
+
+    seat = Seat(
+        event_id=event.id,
+        row_label="A",
+        seat_number=1,
+        price=500,
+        status=SeatStatus.AVAILABLE,
+    )
+    db_session.add(seat)
+    db_session.commit()
+
+    redis_mock = Mock()
+    redis_mock.setex.side_effect = Exception("Redis failure")
+
+    with pytest.raises(Exception, match="Redis failure"):
+        hold_seat(
+            db=db_session,
+            redis_client=redis_mock,
+            user_id=1,
+            event_id=event.id,
+            seat_id=seat.id,
+        )
+
+    db_session.refresh(seat)
+
+    assert seat.status == SeatStatus.AVAILABLE

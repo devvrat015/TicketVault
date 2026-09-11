@@ -47,15 +47,14 @@ def hold_seat(
     try:
         seat.status = SeatStatus.HELD
 
-        db.commit()
-
         redis_key = f"seat_hold:{seat_id}"
-
         redis_client.setex(
             redis_key,
             300,
             str(user_id),
         )
+
+        db.commit()
 
         return {
             "seat_id": seat_id,

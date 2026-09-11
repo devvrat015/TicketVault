@@ -46,3 +46,18 @@ def clear_rate_limits():
     keys = redis_client.keys("ratelimit:*")
     if keys:
         redis_client.delete(*keys)
+
+@pytest.fixture(scope="function")
+def concurrency_client():
+    def override_get_db():
+        session = TestingSessionLocal()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    yield TestClient(app)
+
+    app.dependency_overrides.clear()

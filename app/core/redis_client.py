@@ -20,7 +20,15 @@ async_redis_client = aioredis.from_url(
 
 
 async def publish_event(channel: str, message: dict):
-    await async_redis_client.publish(
-        channel,
-        json.dumps(message),
+    client = aioredis.from_url(
+        settings.REDIS_URL,
+        decode_responses=True,
     )
+
+    try:
+        await client.publish(
+            channel,
+            json.dumps(message),
+        )
+    finally:
+        await client.aclose()

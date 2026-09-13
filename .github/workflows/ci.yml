@@ -47,8 +47,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run tests
-        run: pytest
+      - name: Run tests with coverage
+        run: pytest --cov=app --cov-report=term-missing
 
     env:
       APP_NAME: TicketVault

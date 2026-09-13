@@ -1,0 +1,1 @@
+![CI](https://github.com/devvrat015/TicketVault/actions/workflows/ci.yml/badge.svg)

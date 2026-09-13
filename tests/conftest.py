@@ -9,7 +9,12 @@ from app.api.deps import get_db
 from app.core.redis_client import redis_client
 
 
-TEST_DATABASE_URL = "postgresql://postgres:devvrat7821@localhost:5432/ticketvault_test_db"
+import os
+
+TEST_DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:devvrat7821@localhost:5432/ticketvault_test_db",
+)
 
 engine = create_engine(TEST_DATABASE_URL)
 

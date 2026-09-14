@@ -79,10 +79,10 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     
 async def lifespan(app: FastAPI):
 
-    await async_redis_client.config_set(
-    "notify-keyspace-events",
-    "Ex"
-    )
+    # await async_redis_client.config_set(
+    # "notify-keyspace-events",
+    # "Ex"
+    # )
     
     expired_holds_task = asyncio.create_task(
         listen_for_expired_holds()

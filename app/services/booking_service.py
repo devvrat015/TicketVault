@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-
+import logging
 from app.core.exceptions import (
     EventNotFoundError,
     SeatNotAvailableError,
@@ -10,6 +10,8 @@ from app.models.booking import Booking
 from app.models.enums import BookingStatus, SeatStatus
 from app.models.event import Event
 from app.models.seat import Seat
+
+logger = logging.getLogger(__name__)
 
 def book_seat(
     db: Session,
@@ -22,6 +24,15 @@ def book_seat(
     
 
     try:
+
+        logger.info(
+        "booking attempt started",
+        extra={
+            "user_id": user_id,
+            "event_id": event_id,
+            "seat_id": seat_id,
+        },
+        )
 
         event = db.query(Event).filter(Event.id == event_id).first()
 
@@ -77,8 +88,28 @@ def book_seat(
         db.commit()
         db.refresh(booking)
 
+        logger.info(
+            "booking created successfully",
+            extra={
+                "booking_id": booking.id,
+                "user_id": user_id,
+                "event_id": event_id,
+                "seat_id": seat_id,
+            },
+        )
+
         return booking
 
     except Exception:
         db.rollback()
+
+        logger.exception(
+            "booking failed",
+            extra={
+                "user_id": user_id,
+                "event_id": event_id,
+                "seat_id": seat_id,
+            },
+        )
+
         raise

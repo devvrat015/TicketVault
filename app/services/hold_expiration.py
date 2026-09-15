@@ -58,6 +58,8 @@ async def listen_for_expired_holds():
                 now,
             )
 
+            print("EXPIRED SEATS CHECK:", expired_seats)
+
             for seat_id in expired_seats:
                 seat_id = int(seat_id)
 

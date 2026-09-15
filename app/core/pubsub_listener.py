@@ -1,37 +1,60 @@
+import asyncio
 import json
 
-from app.core.redis_client import async_redis_client
+import redis.asyncio as aioredis
+
+from app.core.config import settings
 from app.core.connection_manager import manager
 
 
 async def listen_for_events():
-    pubsub = async_redis_client.pubsub()
+    while True:
+        pubsub = None
 
-    await pubsub.psubscribe("event:*:updates")
+        try:
+            client = aioredis.from_url(
+                settings.REDIS_URL,
+                decode_responses=True,
+            )
 
-    print("📡 Redis Pub/Sub listener started...")
+            pubsub = client.pubsub()
 
-    try:
-        async for message in pubsub.listen():
+            await pubsub.psubscribe("event:*:updates")
 
-            if message["type"] == "pmessage":
+            print("📡 Redis Pub/Sub listener started...")
 
-                channel = message["channel"]
+            async for message in pubsub.listen():
+                if message["type"] == "pmessage":
+                    channel = message["channel"]
 
-                event_id = int(
-                    channel.split(":")[1]
-                )
+                    event_id = int(
+                        channel.split(":")[1]
+                    )
 
-                data = json.loads(message["data"])
+                    data = json.loads(message["data"])
 
-                print(
-                    f"📨 Received from {channel}: {data}"
-                )
+                    print(
+                        f"📨 Received from {channel}: {data}"
+                    )
 
-                await manager.broadcast(
-                    event_id,
-                    data,
-                )
+                    await manager.broadcast(
+                        event_id,
+                        data,
+                    )
 
-    finally:
-        await pubsub.close()
+        except asyncio.CancelledError:
+            raise
+
+        except Exception as e:
+            print(
+                f"❌ Redis Pub/Sub listener error: {e}"
+            )
+
+            await asyncio.sleep(2)
+
+        finally:
+            if pubsub:
+                await pubsub.aclose()
+
+            if "client" in locals():
+                await client.aclose()

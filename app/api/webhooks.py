@@ -3,7 +3,6 @@ import stripe
 from fastapi import APIRouter, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from app.core.redis_client import async_redis_client, publish_event
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.redis_client import async_redis_client, publish_event

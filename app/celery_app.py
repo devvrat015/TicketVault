@@ -8,6 +8,5 @@ celery_app = Celery(
 )
 
 celery_app.conf.imports = (
-    "app.tasks.test_tasks",
     "app.tasks.email_tasks",
 )

@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+import time
 
 from app.core.exceptions import (
     EventNotFoundError,
@@ -52,6 +53,13 @@ def hold_seat(
             redis_key,
             300,
             str(user_id),
+        )
+
+        expires_at = time.time() + 300
+
+        redis_client.zadd(
+            "seat_holds",
+            {str(seat_id): expires_at},
         )
 
         db.commit()

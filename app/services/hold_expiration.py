@@ -1,7 +1,7 @@
 import asyncio
+import time
 
 from app.core.redis_client import redis_client, publish_event
-from app.core.redis_client import redis_client
 from app.core.database import SessionLocal
 from app.models.enums import SeatStatus
 from app.models.seat import Seat
@@ -27,7 +27,6 @@ async def release_expired_seat(seat_id: int):
         event_id = seat.event_id
 
         seat.status = SeatStatus.AVAILABLE
-
         db.commit()
 
         await publish_event(
@@ -47,34 +46,31 @@ async def release_expired_seat(seat_id: int):
 
 
 async def listen_for_expired_holds():
-    pubsub = redis_client.pubsub()
-
-    pubsub.psubscribe("__keyevent@0__:expired")
-
-    print("REDIS EXPIRATION LISTENER STARTED")
+    print("REDIS SORTED SET EXPIRATION CHECKER STARTED")
 
     try:
         while True:
-            message = await asyncio.to_thread(
-                pubsub.get_message,
-                ignore_subscribe_messages=True,
-                timeout=1.0,
+            now = time.time()
+
+            expired_seats = redis_client.zrangebyscore(
+                "seat_holds",
+                "-inf",
+                now,
             )
 
-            if message:
-                print("REDIS MESSAGE:", message)
+            for seat_id in expired_seats:
+                seat_id = int(seat_id)
 
-                if message["type"] == "pmessage":
-                    key = message["data"]
+                print("HOLD EXPIRED:", seat_id)
 
-                    if key.startswith("seat_hold:"):
-                        seat_id = int(key.split(":")[1])
+                await release_expired_seat(seat_id)
 
-                        print("HOLD EXPIRED:", seat_id)
+                redis_client.zrem(
+                    "seat_holds",
+                    str(seat_id),
+                )
 
-                        await release_expired_seat(seat_id)
+            await asyncio.sleep(1)
 
-            await asyncio.sleep(0.1)
-
-    finally:
-        pubsub.close()
+    except asyncio.CancelledError:
+        raise
